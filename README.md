@@ -84,17 +84,6 @@ It will:
 
 Use this artifact to verify that the app builds successfully before merging.
 
-### Where do I view it?
-
-This workflow does **not** publish a live URL by itself. It produces a downloadable build artifact.
-
-For a PR:
-1. Open the PR on GitHub.
-2. Go to **Checks** and open **PR Preview Build**.
-3. Open the workflow run and download `nextjs-preview-<pr-number>` from the **Artifacts** section.
-
-If you need a clickable preview URL per PR, use a preview-deploy platform (for example Vercel/Netlify) in addition to this build check.
-
 ## Notes
 
 - This tool helps with dimensioning and prototyping; real-world performance still depends on materials, assembly quality, nearby objects, and tuning/measurement.
