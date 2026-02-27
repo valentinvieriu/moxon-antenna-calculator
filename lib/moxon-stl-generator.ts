@@ -1,8 +1,9 @@
-import { booleans, primitives, transforms } from "@jscad/modeling";
+import { booleans, extrusions, primitives, transforms } from "@jscad/modeling";
 import { stlSerializer } from "@jscad/io";
 import type { ConvertedDimensions } from "./moxon-calculator";
 
-const { cuboid, cylinder } = primitives;
+const { cuboid } = primitives;
+const { extrudeLinear } = extrusions;
 const { union, subtract } = booleans;
 const { rotateZ, translate } = transforms;
 
@@ -113,11 +114,30 @@ function createTailEndCap(cfg: PrintConfig) {
 function createCornerBlock(cfg: PrintConfig) {
   const outerWidth = cfg.wireDiameterMm + cfg.tolerance + 2 * cfg.wallThickness;
   const totalHeight = cfg.floorThickness + cfg.channelHeight;
+  const chamfer = Math.min(Math.max(cfg.cornerChamfer, 0), outerWidth / 2 - 0.01);
 
-  return cuboid({
-    size: [outerWidth, outerWidth, totalHeight],
-    center: [0, 0, totalHeight / 2],
+  if (chamfer <= 0) {
+    return cuboid({
+      size: [outerWidth, outerWidth, totalHeight],
+      center: [0, 0, totalHeight / 2],
+    });
+  }
+
+  const half = outerWidth / 2;
+  const cornerProfile = primitives.polygon({
+    points: [
+      [-half + chamfer, -half],
+      [half - chamfer, -half],
+      [half, -half + chamfer],
+      [half, half - chamfer],
+      [half - chamfer, half],
+      [-half + chamfer, half],
+      [-half, half - chamfer],
+      [-half, -half + chamfer],
+    ],
   });
+
+  return extrudeLinear({ height: totalHeight }, cornerProfile);
 }
 
 function createSideBridge(length: number, cfg: PrintConfig) {
@@ -196,14 +216,12 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
     boom,
   ];
 
-  let frame = union(parts);
+  let frame = union(...parts);
 
   if (cfg.mountingHoleDiameter > 0) {
-    const hole = cylinder({
-      height: boomHeight * 2,
-      radius: cfg.mountingHoleDiameter / 2,
+    const hole = cuboid({
+      size: [cfg.mountingHoleDiameter, cfg.mountingHoleDiameter, boomHeight * 2],
       center: [0, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
-      segments: 64,
     });
     frame = subtract(frame, hole);
   }
