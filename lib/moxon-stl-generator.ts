@@ -113,6 +113,11 @@ function createBoomBar(length: number, cfg: PrintConfig) {
   });
 }
 
+function getBridgeXForBoomSideTail(halfA: number) {
+  // Keep the bridge on the boom-side tail pair so it remains fused with the frame.
+  return -halfA;
+}
+
 export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfig) {
   const { a, b, d, e } = dims;
 
@@ -143,7 +148,7 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const bridgeEnd = reflectorTailEnd - cfg.wallThickness;
   const bridgeLength = Math.max(0.1, bridgeEnd - bridgeStart);
 
-  const bridgeX = -halfA;
+  const bridgeX = getBridgeXForBoomSideTail(halfA);
   const sideBridge = translate([bridgeX, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
 
   const cornerDL = translate([-halfA, driverY, 0], createCornerBlock(cfg));
@@ -288,7 +293,7 @@ export function buildFrameGeometry(
 
   // Single bridge connected to one tail pair (boom side)
   const halfBridge = bridgeWidth / 2;
-  const bridgeX = -halfA;
+  const bridgeX = getBridgeXForBoomSideTail(halfA);
   add(bridgeX - halfBridge, driverTailEnd + cfg.wallThickness, 0, bridgeX + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
 
   // Corner blocks (simplified to boxes for preview; STL uses CSG union)
