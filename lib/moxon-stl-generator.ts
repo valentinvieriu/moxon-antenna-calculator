@@ -2,7 +2,7 @@ import { booleans, extrusions, primitives, transforms } from "@jscad/modeling";
 import { stlSerializer } from "@jscad/io";
 import type { ConvertedDimensions } from "./moxon-calculator";
 
-const { cuboid } = primitives;
+const { cuboid, cylinder } = primitives;
 const { extrudeLinear } = extrusions;
 const { union, subtract } = booleans;
 const { rotateZ, translate } = transforms;
@@ -22,7 +22,7 @@ export interface PrintConfig {
   boomWidth: number;
   /** Length of the mounting tail behind the reflector (mm) */
   mountingTailLength: number;
-  /** Side length of the square mounting hole in the tail (mm). 0 = no hole. */
+  /** Diameter of the mounting hole in the tail (mm). 0 = no hole. */
   mountingHoleDiameter: number;
   /** Size of chamfer cut on corner blocks (mm) */
   cornerChamfer: number;
@@ -39,49 +39,6 @@ export const DEFAULT_PRINT_CONFIG: PrintConfig = {
   mountingHoleDiameter: 4,
   cornerChamfer: 1.5,
 };
-
-interface GenerationTransform {
-  dims: ConvertedDimensions;
-  cfg: PrintConfig;
-}
-
-// Calibrated to match the bundled `public/moxon_868mhz.stl` envelope.
-const REFERENCE_ALIGNMENT = {
-  xScale: 57.57206726074219 / 129.16844306574998,
-  yScale: 1.8378423699180566,
-  zScale: 9.899999618530273 / 5.5,
-};
-
-function alignToReferenceModel(
-  dims: ConvertedDimensions,
-  cfg: PrintConfig
-): GenerationTransform {
-  const d: ConvertedDimensions = {
-    ...dims,
-    a: dims.a * REFERENCE_ALIGNMENT.xScale,
-    b: dims.b * REFERENCE_ALIGNMENT.yScale,
-    c: dims.c * REFERENCE_ALIGNMENT.yScale,
-    d: dims.d * REFERENCE_ALIGNMENT.yScale,
-    e: dims.e * REFERENCE_ALIGNMENT.yScale,
-    drivenCutLength: dims.drivenCutLength * REFERENCE_ALIGNMENT.yScale,
-    reflectorCutLength: dims.reflectorCutLength * REFERENCE_ALIGNMENT.yScale,
-  };
-
-  const c: PrintConfig = {
-    ...cfg,
-    wireDiameterMm: cfg.wireDiameterMm * REFERENCE_ALIGNMENT.xScale,
-    tolerance: cfg.tolerance * REFERENCE_ALIGNMENT.xScale,
-    wallThickness: cfg.wallThickness * REFERENCE_ALIGNMENT.xScale,
-    floorThickness: cfg.floorThickness * REFERENCE_ALIGNMENT.zScale,
-    channelHeight: cfg.channelHeight * REFERENCE_ALIGNMENT.zScale,
-    boomWidth: cfg.boomWidth * REFERENCE_ALIGNMENT.xScale,
-    mountingTailLength: cfg.mountingTailLength * REFERENCE_ALIGNMENT.yScale,
-    mountingHoleDiameter: cfg.mountingHoleDiameter * REFERENCE_ALIGNMENT.xScale,
-    cornerChamfer: cfg.cornerChamfer * REFERENCE_ALIGNMENT.xScale,
-  };
-
-  return { dims: d, cfg: c };
-}
 
 function createChannelSegment(length: number, cfg: PrintConfig) {
   const innerWidth = cfg.wireDiameterMm + cfg.tolerance;
@@ -219,9 +176,11 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   let frame = union(...parts);
 
   if (cfg.mountingHoleDiameter > 0) {
-    const hole = cuboid({
-      size: [cfg.mountingHoleDiameter, cfg.mountingHoleDiameter, boomHeight * 2],
+    const hole = cylinder({
+      height: boomHeight * 2,
+      radius: cfg.mountingHoleDiameter / 2,
       center: [0, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
+      segments: 64,
     });
     frame = subtract(frame, hole);
   }
@@ -251,9 +210,7 @@ export function buildFrameGeometry(
   dims: ConvertedDimensions,
   cfg: PrintConfig = DEFAULT_PRINT_CONFIG
 ): FrameGeometry {
-  const aligned = alignToReferenceModel(dims, cfg);
-  const { a, b, d, e } = aligned.dims;
-  cfg = aligned.cfg;
+  const { a, b, d, e } = dims;
 
   const halfA = a / 2;
   const driverY = -e / 2;
@@ -348,8 +305,7 @@ export function generateMoxonStl(
   dims: ConvertedDimensions,
   cfg: PrintConfig = DEFAULT_PRINT_CONFIG
 ): Blob {
-  const aligned = alignToReferenceModel(dims, cfg);
-  const geometry = generateMoxonGeometry(aligned.dims, aligned.cfg);
+  const geometry = generateMoxonGeometry(dims, cfg);
 
   const rawData = stlSerializer.serialize({ binary: true }, geometry) as ArrayBuffer[];
   return new Blob(rawData, { type: "application/octet-stream" });
