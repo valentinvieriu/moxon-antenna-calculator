@@ -5,7 +5,7 @@ import type { ConvertedDimensions } from "./moxon-calculator";
 const { cuboid, cylinder } = primitives;
 const { extrudeLinear } = extrusions;
 const { union, subtract } = booleans;
-const { rotateZ, translate } = transforms;
+const { rotateY, rotateZ, translate } = transforms;
 
 export interface PrintConfig {
   /** Bare wire diameter (mm) */
@@ -105,11 +105,11 @@ function createSideBridge(length: number, cfg: PrintConfig) {
   });
 }
 
-function createVerticalBoom(length: number, cfg: PrintConfig) {
+function createBoomBar(length: number, cfg: PrintConfig) {
   const boomHeight = cfg.floorThickness + 1.5;
   return cuboid({
-    size: [cfg.boomWidth, length, boomHeight],
-    center: [0, length / 2, boomHeight / 2],
+    size: [length, cfg.boomWidth, boomHeight],
+    center: [length / 2, 0, boomHeight / 2],
   });
 }
 
@@ -151,13 +151,16 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const cornerRL = translate([-halfA, reflectorY, 0], createCornerBlock(cfg));
   const cornerRR = translate([halfA, reflectorY, 0], createCornerBlock(cfg));
 
-  const boomX = -halfA - halfOuter - cfg.boomWidth / 2;
-  const boomStart = reflectorY - halfOuter;
-  const boomBodyEnd = driverY + halfOuter;
-  const tailEnd = boomBodyEnd - cfg.mountingTailLength;
-  const boomLength = Math.max(0.1, boomStart - tailEnd);
   const boomHeight = cfg.floorThickness + 1.5;
-  const boom = translate([boomX, tailEnd, 0], createVerticalBoom(boomLength, cfg));
+  const centerPostWidth = Math.max(cfg.boomWidth * 0.6, outerWidth);
+  const centerPost = cuboid({
+    size: [centerPostWidth, bridgeLength + 2 * cfg.wallThickness, boomHeight],
+    center: [0, (bridgeStart + bridgeEnd) / 2, boomHeight / 2],
+  });
+
+  const tailY = driverY - halfOuter + cfg.boomWidth / 2;
+  const tailLength = Math.max(0.1, halfA + cfg.mountingTailLength);
+  const tailBoom = translate([0, tailY, 0], createBoomBar(tailLength, cfg));
 
   const parts = [
     driverCenter,
@@ -175,19 +178,23 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
     cornerDR,
     cornerRL,
     cornerRR,
-    boom,
+    centerPost,
+    tailBoom,
   ];
 
   let frame = union(...parts);
 
   if (cfg.mountingHoleDiameter > 0) {
-    const hole = cylinder({
-      height: boomHeight * 2,
-      radius: cfg.mountingHoleDiameter / 2,
-      center: [boomX, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
-      segments: 64,
-    });
-    frame = subtract(frame, hole);
+    const boreLength = tailLength + cfg.boomWidth;
+    const bore = rotateY(Math.PI / 2,
+      cylinder({
+        height: boreLength,
+        radius: cfg.mountingHoleDiameter / 2,
+        center: [tailLength / 2, tailY, boomHeight / 2],
+        segments: 64,
+      })
+    );
+    frame = subtract(frame, bore);
   }
 
   return frame;
@@ -291,12 +298,13 @@ export function buildFrameGeometry(
     }
   }
 
-  // Side boom + mounting tail (extends below driven element)
-  const boomX = -halfA - halfOuter - halfBoom;
-  const boomStart = reflectorY - halfOuter;
-  const boomBodyEnd = driverY + halfOuter;
-  const tailEnd = boomBodyEnd - cfg.mountingTailLength;
-  add(boomX, tailEnd, 0, boomX + cfg.boomWidth, boomStart, boomHeight, "boom");
+  // Center post for feed/cable guide and horizontal mounting tail
+  const centerPostWidth = Math.max(cfg.boomWidth * 0.6, outerWidth);
+  add(-centerPostWidth / 2, driverTailEnd, 0, centerPostWidth / 2, reflectorTailEnd, boomHeight, "boom");
+
+  const tailY = driverY - halfOuter + halfBoom;
+  const tailLength = Math.max(0.1, halfA + cfg.mountingTailLength);
+  add(0, tailY - halfBoom, 0, tailLength, tailY + halfBoom, boomHeight, "boom");
 
   return { boxes };
 }
