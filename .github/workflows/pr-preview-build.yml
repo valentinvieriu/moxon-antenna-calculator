@@ -1,0 +1,85 @@
+name: PR Preview Build
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview-build:
+    name: Build preview artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-preview-${{ github.event.pull_request.number || github.run_number }}
+          path: |
+            .next
+            public
+            package.json
+            package-lock.json
+            next.config.mjs
+          if-no-files-found: error
+
+      - name: Add PR comment with artifact location
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = [
+              '✅ PR preview build completed.',
+              '',
+              'This workflow uploads a **build artifact** (not a live deployed URL).',
+              `Open the workflow run and download **nextjs-preview-${prNumber}**: ${runUrl}`,
+              '',
+              'If you want a public URL preview, connect the repo to a hosting provider that supports Preview Deployments (for example Vercel or Netlify).',
+            ].join('\n')
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            })
+
+            const marker = '✅ PR preview build completed.'
+            const existing = comments.find(c => c.user?.type === 'Bot' && c.body?.includes(marker))
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              })
+            }
