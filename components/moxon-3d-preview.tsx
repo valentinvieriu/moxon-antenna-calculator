@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment, Text } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import type { MoxonResults } from "@/lib/moxon-calculator";
 import {
   buildFrameGeometry,
@@ -59,51 +59,7 @@ function FrameMesh({
         </mesh>
       ))}
 
-      {/* Dimension labels */}
-      <Text
-        position={[0, -0.4 * scale, (dims.e / 2) * scale]}
-        fontSize={0.15}
-        color="#94a3b8"
-        anchorX="center"
-        anchorY="top"
-      >
-        {`A = ${dims.a.toFixed(1)} mm`}
-      </Text>
-      <Text
-        position={[(dims.a / 2) * scale + 0.3, -0.3 * scale, 0]}
-        fontSize={0.12}
-        color="#94a3b8"
-        anchorX="left"
-        anchorY="middle"
-      >
-        {`E = ${dims.e.toFixed(1)} mm`}
-      </Text>
-
-      {/* Direction arrow label */}
-      <Text
-        position={[0, 0.2, (dims.e / 2 + 10) * scale]}
-        fontSize={0.11}
-        color="#64748b"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {"Direction of radiation \u2192"}
-      </Text>
     </group>
-  );
-}
-
-function EmptyState() {
-  return (
-    <Text
-      position={[0, 0, 0]}
-      fontSize={0.2}
-      color="#64748b"
-      anchorX="center"
-      anchorY="middle"
-    >
-      Enter valid parameters to preview
-    </Text>
   );
 }
 
@@ -112,7 +68,7 @@ export default function Moxon3DPreview({
   wireDiameterMm,
 }: Moxon3DPreviewProps) {
   return (
-    <div className="w-full h-[320px] rounded-xl overflow-hidden bg-diagram-bg border border-border">
+    <div className="relative w-full h-[320px] rounded-xl overflow-hidden bg-diagram-bg border border-border">
       <Canvas
         camera={{
           position: [0, 8, 5],
@@ -122,15 +78,10 @@ export default function Moxon3DPreview({
         }}
         gl={{ antialias: true }}
       >
-        <Environment preset="studio" />
         <ambientLight intensity={0.3} />
         <directionalLight position={[5, 8, 5]} intensity={0.8} />
 
-        {results ? (
-          <FrameMesh results={results} wireDiameterMm={wireDiameterMm} />
-        ) : (
-          <EmptyState />
-        )}
+        {results && <FrameMesh results={results} wireDiameterMm={wireDiameterMm} />}
 
         <OrbitControls
           enableDamping
@@ -146,6 +97,11 @@ export default function Moxon3DPreview({
 
         <gridHelper args={[10, 20, "#334155", "#1e293b"]} />
       </Canvas>
+      {!results && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted-foreground">
+          Enter valid parameters to preview
+        </div>
+      )}
     </div>
   );
 }

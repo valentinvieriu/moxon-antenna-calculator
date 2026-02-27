@@ -5,7 +5,7 @@ import type { ConvertedDimensions } from "./moxon-calculator";
 const { cuboid, cylinder } = primitives;
 const { extrudeLinear } = extrusions;
 const { union, subtract } = booleans;
-const { rotateZ, translate } = transforms;
+const { rotateY, rotateZ, translate } = transforms;
 
 export interface PrintConfig {
   /** Bare wire diameter (mm) */
@@ -105,6 +105,14 @@ function createSideBridge(length: number, cfg: PrintConfig) {
   });
 }
 
+function createBoomBar(length: number, cfg: PrintConfig) {
+  const boomHeight = cfg.floorThickness + 1.5;
+  return cuboid({
+    size: [length, cfg.boomWidth, boomHeight],
+    center: [length / 2, 0, boomHeight / 2],
+  });
+}
+
 export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfig) {
   const { a, b, d, e } = dims;
 
@@ -135,8 +143,8 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const bridgeEnd = reflectorTailEnd - cfg.wallThickness;
   const bridgeLength = Math.max(0.1, bridgeEnd - bridgeStart);
 
-  const sideBridgeLeft = translate([-halfA, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
-  const sideBridgeRight = translate([halfA, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
+  const bridgeX = -halfA;
+  const sideBridge = translate([bridgeX, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
 
   const cornerDL = translate([-halfA, driverY, 0], createCornerBlock(cfg));
   const cornerDR = translate([halfA, driverY, 0], createCornerBlock(cfg));
@@ -144,14 +152,15 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const cornerRR = translate([halfA, reflectorY, 0], createCornerBlock(cfg));
 
   const boomHeight = cfg.floorThickness + 1.5;
-  const boomStart = driverY - halfOuter;
-  const boomBodyEnd = reflectorY + halfOuter;
-  const tailEnd = boomBodyEnd + cfg.mountingTailLength;
-
-  const boom = cuboid({
-    size: [cfg.boomWidth, tailEnd - boomStart, boomHeight],
-    center: [0, (boomStart + tailEnd) / 2, boomHeight / 2],
+  const centerPostWidth = Math.max(cfg.boomWidth * 0.6, outerWidth);
+  const centerPost = cuboid({
+    size: [centerPostWidth, bridgeLength + 2 * cfg.wallThickness, boomHeight],
+    center: [0, (bridgeStart + bridgeEnd) / 2, boomHeight / 2],
   });
+
+  const tailY = driverY - halfOuter + cfg.boomWidth / 2;
+  const tailLength = Math.max(0.1, halfA + cfg.mountingTailLength);
+  const tailBoom = translate([0, tailY, 0], createBoomBar(tailLength, cfg));
 
   const parts = [
     driverCenter,
@@ -164,25 +173,28 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
     reflectorTailRight,
     reflectorEndCapLeft,
     reflectorEndCapRight,
-    sideBridgeLeft,
-    sideBridgeRight,
+    sideBridge,
     cornerDL,
     cornerDR,
     cornerRL,
     cornerRR,
-    boom,
+    centerPost,
+    tailBoom,
   ];
 
   let frame = union(...parts);
 
   if (cfg.mountingHoleDiameter > 0) {
-    const hole = cylinder({
-      height: boomHeight * 2,
-      radius: cfg.mountingHoleDiameter / 2,
-      center: [0, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
-      segments: 64,
-    });
-    frame = subtract(frame, hole);
+    const boreLength = tailLength + cfg.boomWidth;
+    const bore = rotateY(Math.PI / 2,
+      cylinder({
+        height: boreLength,
+        radius: cfg.mountingHoleDiameter / 2,
+        center: [tailLength / 2, tailY, boomHeight / 2],
+        segments: 64,
+      })
+    );
+    frame = subtract(frame, bore);
   }
 
   return frame;
@@ -274,10 +286,10 @@ export function buildFrameGeometry(
     add(xc - halfOuter, reflectorTailEnd - cfg.wallThickness, 0, xc + halfOuter, reflectorTailEnd, totalHeight, "endcap");
   }
 
-  // Side bridges
+  // Single bridge connected to one tail pair (boom side)
   const halfBridge = bridgeWidth / 2;
-  add(-halfA - halfBridge, driverTailEnd + cfg.wallThickness, 0, -halfA + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
-  add(halfA - halfBridge, driverTailEnd + cfg.wallThickness, 0, halfA + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
+  const bridgeX = -halfA;
+  add(bridgeX - halfBridge, driverTailEnd + cfg.wallThickness, 0, bridgeX + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
 
   // Corner blocks (simplified to boxes for preview; STL uses CSG union)
   for (const xc of [-halfA, halfA]) {
@@ -286,15 +298,13 @@ export function buildFrameGeometry(
     }
   }
 
-  // Boom body
-  const boomStart = driverY - halfOuter;
-  const boomBodyEnd = reflectorY + halfOuter;
-  add(-halfBoom, boomStart, 0, halfBoom, boomBodyEnd, boomHeight, "boom");
+  // Center post for feed/cable guide and horizontal mounting tail
+  const centerPostWidth = Math.max(cfg.boomWidth * 0.6, outerWidth);
+  add(-centerPostWidth / 2, driverTailEnd, 0, centerPostWidth / 2, reflectorTailEnd, boomHeight, "boom");
 
-  // Mounting tail (boom extends behind reflector)
-  const tailStart = boomBodyEnd;
-  const tailEnd = tailStart + cfg.mountingTailLength;
-  add(-halfBoom, tailStart, 0, halfBoom, tailEnd, boomHeight, "boom");
+  const tailY = driverY - halfOuter + halfBoom;
+  const tailLength = Math.max(0.1, halfA + cfg.mountingTailLength);
+  add(0, tailY - halfBoom, 0, tailLength, tailY + halfBoom, boomHeight, "boom");
 
   return { boxes };
 }
