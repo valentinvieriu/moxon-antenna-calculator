@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "test:business": "node --test --experimental-strip-types tests/business-logic.test.ts",
     "start": "next start"
   },
   "dependencies": {
