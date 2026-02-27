@@ -10,8 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { DiameterUnit } from "@/lib/moxon-calculator";
-import { diameterUnitLabels } from "@/lib/moxon-calculator";
+import type { DiameterUnit, WireMaterial } from "@/lib/moxon-calculator";
+import { diameterUnitLabels, wireMaterialLabels } from "@/lib/moxon-calculator";
 
 interface MoxonInputFormProps {
   frequency: string;
@@ -20,8 +20,10 @@ interface MoxonInputFormProps {
   setWireDiameter: (value: string) => void;
   diameterUnit: DiameterUnit;
   setDiameterUnit: (value: DiameterUnit) => void;
-  isInsulated: boolean;
-  setIsInsulated: (value: boolean) => void;
+  isSleeved: boolean;
+  setIsSleeved: (value: boolean) => void;
+  wireMaterial: WireMaterial;
+  setWireMaterial: (value: WireMaterial) => void;
 }
 
 export function MoxonInputForm({
@@ -31,12 +33,13 @@ export function MoxonInputForm({
   setWireDiameter,
   diameterUnit,
   setDiameterUnit,
-  isInsulated,
-  setIsInsulated,
+  isSleeved,
+  setIsSleeved,
+  wireMaterial,
+  setWireMaterial,
 }: MoxonInputFormProps) {
   return (
     <div className="flex flex-col gap-5">
-      {/* Frequency Input */}
       <div className="flex flex-col gap-2">
         <Label htmlFor="frequency" className="text-sm font-medium text-foreground">
           Frequency (MHz)
@@ -52,12 +55,9 @@ export function MoxonInputForm({
           min="0"
           step="any"
         />
-        <p className="text-xs text-muted-foreground">
-          Center frequency for your antenna design
-        </p>
+        <p className="text-xs text-muted-foreground">Center frequency for your antenna design</p>
       </div>
 
-      {/* Wire Diameter Input */}
       <div className="flex flex-col gap-2">
         <Label htmlFor="diameter" className="text-sm font-medium text-foreground">
           Wire Diameter (conductor only)
@@ -96,22 +96,46 @@ export function MoxonInputForm({
         </p>
       </div>
 
-      {/* Insulated Wire Toggle */}
-      <div className="flex items-center justify-between rounded-lg border border-border p-4">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="insulated-toggle" className="text-sm font-medium text-foreground">
-            Insulated wire (PVC)
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Uses 0.97 velocity factor. At 868 MHz, shorten cuts 1–2 mm for tuning.
-          </p>
+      <details className="rounded-lg border border-border p-4">
+        <summary className="cursor-pointer text-sm font-medium text-foreground">Advanced wire settings</summary>
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="wire-material" className="text-sm font-medium text-foreground">
+              Conductor material
+            </Label>
+            <Select
+              value={wireMaterial}
+              onValueChange={(v) => setWireMaterial(v as WireMaterial)}
+            >
+              <SelectTrigger id="wire-material" className="h-12 bg-input border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(wireMaterialLabels) as WireMaterial[]).map((material) => (
+                  <SelectItem key={material} value={material}>
+                    {wireMaterialLabels[material]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Stainless steel uses a small correction compared to copper.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border p-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="sleeved-toggle" className="text-sm font-medium text-foreground">
+                Sleeved wire (PVC)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Uses a 0.97 velocity-factor correction when insulation sleeve stays on the wire.
+              </p>
+            </div>
+            <Switch id="sleeved-toggle" checked={isSleeved} onCheckedChange={setIsSleeved} />
+          </div>
         </div>
-        <Switch
-          id="insulated-toggle"
-          checked={isInsulated}
-          onCheckedChange={setIsInsulated}
-        />
-      </div>
+      </details>
     </div>
   );
 }

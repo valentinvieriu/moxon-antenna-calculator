@@ -120,9 +120,11 @@ export function MoxonResultsTable({ results, displayUnit, frequencyMHz, wireDiam
             </span>
           </div>
         </div>
-        {results.isInsulated && (
+        {results.velocityFactor < 1 && (
           <p className="text-xs text-accent">
-            Lengths include {((1 - results.velocityFactor) * 100).toFixed(0)}% velocity-factor correction for insulated wire.
+            Lengths include {((1 - results.velocityFactor) * 100).toFixed(1)}% total correction for
+            {" "}{results.wireMaterial === "stainless" ? "stainless steel" : "copper"}
+            {results.isSleeved ? " sleeved wire" : " bare wire"}.
           </p>
         )}
       </div>
