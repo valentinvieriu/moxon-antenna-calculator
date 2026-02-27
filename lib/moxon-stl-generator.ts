@@ -143,8 +143,8 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const bridgeEnd = reflectorTailEnd - cfg.wallThickness;
   const bridgeLength = Math.max(0.1, bridgeEnd - bridgeStart);
 
-  const sideBridgeCenterX = 0;
-  const sideBridge = translate([sideBridgeCenterX, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
+  const bridgeX = -halfA;
+  const sideBridge = translate([bridgeX, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
 
   const cornerDL = translate([-halfA, driverY, 0], createCornerBlock(cfg));
   const cornerDR = translate([halfA, driverY, 0], createCornerBlock(cfg));
@@ -279,9 +279,10 @@ export function buildFrameGeometry(
     add(xc - halfOuter, reflectorTailEnd - cfg.wallThickness, 0, xc + halfOuter, reflectorTailEnd, totalHeight, "endcap");
   }
 
-  // Center bridge between tail tips
+  // Single bridge connected to one tail pair (boom side)
   const halfBridge = bridgeWidth / 2;
-  add(-halfBridge, driverTailEnd + cfg.wallThickness, 0, halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
+  const bridgeX = -halfA;
+  add(bridgeX - halfBridge, driverTailEnd + cfg.wallThickness, 0, bridgeX + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
 
   // Corner blocks (simplified to boxes for preview; STL uses CSG union)
   for (const xc of [-halfA, halfA]) {
