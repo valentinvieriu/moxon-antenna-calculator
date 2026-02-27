@@ -66,7 +66,6 @@ function FrameMesh({
         color="#94a3b8"
         anchorX="center"
         anchorY="top"
-        font="/fonts/GeistMono-Regular.ttf"
       >
         {`A = ${dims.a.toFixed(1)} mm`}
       </Text>
@@ -76,7 +75,6 @@ function FrameMesh({
         color="#94a3b8"
         anchorX="left"
         anchorY="middle"
-        font="/fonts/GeistMono-Regular.ttf"
       >
         {`E = ${dims.e.toFixed(1)} mm`}
       </Text>
@@ -88,7 +86,6 @@ function FrameMesh({
         color="#64748b"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/Geist-Regular.ttf"
       >
         {"Direction of radiation \u2192"}
       </Text>
@@ -104,7 +101,6 @@ function EmptyState() {
       color="#64748b"
       anchorX="center"
       anchorY="middle"
-      font="/fonts/Geist-Regular.ttf"
     >
       Enter valid parameters to preview
     </Text>
