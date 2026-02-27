@@ -4,6 +4,7 @@
 
 export type DiameterUnit = "in" | "mm" | "awg" | "wl";
 export type OutputUnit = "wl" | "ft" | "in" | "m" | "mm";
+export type WireMaterial = "copper" | "stainless";
 
 export interface MoxonDimensions {
   a: number; // Overall width (corner-to-corner, same for both elements)
@@ -32,7 +33,8 @@ export interface ConvertedDimensions {
 
 export interface MoxonResults {
   dimensions: MoxonDimensions;
-  isInsulated: boolean;
+  isSleeved: boolean;
+  wireMaterial: WireMaterial;
   velocityFactor: number;
   converted: {
     [K in OutputUnit]: ConvertedDimensions;
@@ -45,8 +47,15 @@ const SPEED_OF_LIGHT_IN = 11802.71; // inches per MHz wavelength
 const SPEED_OF_LIGHT_M = 299.7925; // meters per MHz wavelength
 const SPEED_OF_LIGHT_MM = 299792.5; // mm per MHz wavelength
 
-// Velocity factor for PVC-insulated wire (typical H07V-U)
-const INSULATED_VELOCITY_FACTOR = 0.97;
+// Material correction is a practical tuning offset for common hobby wire choices.
+// Copper is the baseline used by most calculators.
+const MATERIAL_CORRECTION_FACTOR: Record<WireMaterial, number> = {
+  copper: 1,
+  stainless: 0.992,
+};
+
+// Velocity factor for sleeved (PVC-insulated) wire
+const SLEEVED_VELOCITY_FACTOR = 0.97;
 
 // Convert wire diameter to wavelengths
 function convertToWavelengths(
@@ -76,7 +85,8 @@ export function calculateMoxon(
   frequencyMHz: number,
   wireDiameter: number,
   diameterUnit: DiameterUnit,
-  isInsulated: boolean = false
+  isSleeved: boolean = false,
+  wireMaterial: WireMaterial = "copper"
 ): MoxonResults | null {
   // Safety guard: prevent NaN / Infinity from log(0) or division by zero
   if (frequencyMHz <= 0 || wireDiameter <= 0) {
@@ -115,8 +125,10 @@ export function calculateMoxon(
 
   let d = 0.001 * log10Diameter + 0.07178571429;
 
-  // Apply insulated wire velocity factor correction
-  const velocityFactor = isInsulated ? INSULATED_VELOCITY_FACTOR : 1.0;
+  // Apply wire corrections
+  const sleevedFactor = isSleeved ? SLEEVED_VELOCITY_FACTOR : 1.0;
+  const materialFactor = MATERIAL_CORRECTION_FACTOR[wireMaterial];
+  const velocityFactor = sleevedFactor * materialFactor;
   a *= velocityFactor;
   b *= velocityFactor;
   c *= velocityFactor;
@@ -163,7 +175,8 @@ export function calculateMoxon(
 
   return {
     dimensions,
-    isInsulated,
+    isSleeved,
+    wireMaterial,
     velocityFactor,
     converted: {
       wl: convert(1),
@@ -197,4 +210,9 @@ export const diameterUnitLabels: Record<DiameterUnit, string> = {
   mm: "Millimeters",
   awg: "AWG",
   wl: "Wavelengths",
+};
+
+export const wireMaterialLabels: Record<WireMaterial, string> = {
+  copper: "Copper",
+  stainless: "Stainless steel",
 };

@@ -28,18 +28,29 @@ test('calculateMoxon maintains core geometry relationships', () => {
   assertAlmostEqual(dimensions.reflectorCutLength, dimensions.a + 2 * dimensions.d);
 });
 
-test('insulated wire applies velocity factor scaling to wavelength dimensions', () => {
+test('sleeved wire applies velocity factor scaling to wavelength dimensions', () => {
   const bare = calculateMoxon(14.2, 1.5, 'mm', false);
-  const insulated = calculateMoxon(14.2, 1.5, 'mm', true);
+  const sleeved = calculateMoxon(14.2, 1.5, 'mm', true);
 
   assert.ok(bare);
-  assert.ok(insulated);
-  assert.equal(insulated.velocityFactor, 0.97);
+  assert.ok(sleeved);
+  assert.equal(sleeved.velocityFactor, 0.97);
 
   const keys = ['a', 'b', 'c', 'd', 'e', 'drivenCutLength', 'reflectorCutLength'] as const;
   for (const key of keys) {
-    assertAlmostEqual(insulated.dimensions[key], bare.dimensions[key] * insulated.velocityFactor);
+    assertAlmostEqual(sleeved.dimensions[key], bare.dimensions[key] * sleeved.velocityFactor);
   }
+});
+
+test('stainless material applies additional shortening compared to copper', () => {
+  const copper = calculateMoxon(14.2, 1.5, 'mm', false, 'copper');
+  const stainless = calculateMoxon(14.2, 1.5, 'mm', false, 'stainless');
+
+  assert.ok(copper);
+  assert.ok(stainless);
+  assert.equal(copper.velocityFactor, 1);
+  assert.equal(stainless.velocityFactor, 0.992);
+  assert.ok(stainless.dimensions.a < copper.dimensions.a);
 });
 
 test('converted output units are internally consistent', () => {

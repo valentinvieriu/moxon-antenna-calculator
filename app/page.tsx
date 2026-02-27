@@ -8,7 +8,7 @@ import { MoxonResultsTable } from "@/components/moxon-results-table";
 import { UnitSelector } from "@/components/unit-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateMoxon } from "@/lib/moxon-calculator";
-import type { DiameterUnit, OutputUnit } from "@/lib/moxon-calculator";
+import type { DiameterUnit, OutputUnit, WireMaterial } from "@/lib/moxon-calculator";
 import { AlertCircle, Radio, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,7 +27,8 @@ export default function MoxonCalculator() {
   const [wireDiameter, setWireDiameter] = useState("1.38");
   const [diameterUnit, setDiameterUnit] = useState<DiameterUnit>("mm");
   const [displayUnit, setDisplayUnit] = useState<OutputUnit>("mm");
-  const [isInsulated, setIsInsulated] = useState(false);
+  const [isSleeved, setIsSleeved] = useState(false);
+  const [wireMaterial, setWireMaterial] = useState<WireMaterial>("copper");
 
   // Calculate results
   const results = useMemo(() => {
@@ -38,8 +39,8 @@ export default function MoxonCalculator() {
       return null;
     }
 
-    return calculateMoxon(freq, diam, diameterUnit, isInsulated);
-  }, [frequency, wireDiameter, diameterUnit, isInsulated]);
+    return calculateMoxon(freq, diam, diameterUnit, isSleeved, wireMaterial);
+  }, [frequency, wireDiameter, diameterUnit, isSleeved, wireMaterial]);
 
   const isValid = results !== null;
 
@@ -64,7 +65,8 @@ export default function MoxonCalculator() {
     setFrequency("869.525");
     setWireDiameter("1.38");
     setDiameterUnit("mm");
-    setIsInsulated(false);
+    setIsSleeved(false);
+    setWireMaterial("copper");
   };
 
   return (
@@ -108,8 +110,10 @@ export default function MoxonCalculator() {
               setWireDiameter={setWireDiameter}
               diameterUnit={diameterUnit}
               setDiameterUnit={setDiameterUnit}
-              isInsulated={isInsulated}
-              setIsInsulated={setIsInsulated}
+              isSleeved={isSleeved}
+              setIsSleeved={setIsSleeved}
+              wireMaterial={wireMaterial}
+              setWireMaterial={setWireMaterial}
             />
           </div>
         </section>
@@ -195,7 +199,7 @@ export default function MoxonCalculator() {
             </ul>
             <p className="pt-1 border-t border-border mt-1">
               Default: EU868 Meshtastic (869.525 MHz) with H07V-U 1.5 mm&#178; solid copper wire (bare conductor diameter 1.38 mm).
-              Toggle "insulated" if you keep the PVC jacket on.
+              Use Advanced wire settings for copper vs stainless and sleeved wire compensation.
             </p>
           </div>
         </section>
