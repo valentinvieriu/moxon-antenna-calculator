@@ -105,6 +105,14 @@ function createSideBridge(length: number, cfg: PrintConfig) {
   });
 }
 
+function createVerticalBoom(length: number, cfg: PrintConfig) {
+  const boomHeight = cfg.floorThickness + 1.5;
+  return cuboid({
+    size: [cfg.boomWidth, length, boomHeight],
+    center: [0, length / 2, boomHeight / 2],
+  });
+}
+
 export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfig) {
   const { a, b, d, e } = dims;
 
@@ -135,23 +143,21 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
   const bridgeEnd = reflectorTailEnd - cfg.wallThickness;
   const bridgeLength = Math.max(0.1, bridgeEnd - bridgeStart);
 
-  const sideBridgeLeft = translate([-halfA, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
-  const sideBridgeRight = translate([halfA, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
+  const sideBridgeCenterX = 0;
+  const sideBridge = translate([sideBridgeCenterX, bridgeStart, 0], createSideBridge(bridgeLength, cfg));
 
   const cornerDL = translate([-halfA, driverY, 0], createCornerBlock(cfg));
   const cornerDR = translate([halfA, driverY, 0], createCornerBlock(cfg));
   const cornerRL = translate([-halfA, reflectorY, 0], createCornerBlock(cfg));
   const cornerRR = translate([halfA, reflectorY, 0], createCornerBlock(cfg));
 
+  const boomX = -halfA - halfOuter - cfg.boomWidth / 2;
+  const boomStart = reflectorY - halfOuter;
+  const boomBodyEnd = driverY + halfOuter;
+  const tailEnd = boomBodyEnd - cfg.mountingTailLength;
+  const boomLength = Math.max(0.1, boomStart - tailEnd);
   const boomHeight = cfg.floorThickness + 1.5;
-  const boomStart = driverY - halfOuter;
-  const boomBodyEnd = reflectorY + halfOuter;
-  const tailEnd = boomBodyEnd + cfg.mountingTailLength;
-
-  const boom = cuboid({
-    size: [cfg.boomWidth, tailEnd - boomStart, boomHeight],
-    center: [0, (boomStart + tailEnd) / 2, boomHeight / 2],
-  });
+  const boom = translate([boomX, tailEnd, 0], createVerticalBoom(boomLength, cfg));
 
   const parts = [
     driverCenter,
@@ -164,8 +170,7 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
     reflectorTailRight,
     reflectorEndCapLeft,
     reflectorEndCapRight,
-    sideBridgeLeft,
-    sideBridgeRight,
+    sideBridge,
     cornerDL,
     cornerDR,
     cornerRL,
@@ -179,7 +184,7 @@ export function generateMoxonGeometry(dims: ConvertedDimensions, cfg: PrintConfi
     const hole = cylinder({
       height: boomHeight * 2,
       radius: cfg.mountingHoleDiameter / 2,
-      center: [0, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
+      center: [boomX, (boomBodyEnd + tailEnd) / 2, boomHeight / 2],
       segments: 64,
     });
     frame = subtract(frame, hole);
@@ -274,10 +279,9 @@ export function buildFrameGeometry(
     add(xc - halfOuter, reflectorTailEnd - cfg.wallThickness, 0, xc + halfOuter, reflectorTailEnd, totalHeight, "endcap");
   }
 
-  // Side bridges
+  // Center bridge between tail tips
   const halfBridge = bridgeWidth / 2;
-  add(-halfA - halfBridge, driverTailEnd + cfg.wallThickness, 0, -halfA + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
-  add(halfA - halfBridge, driverTailEnd + cfg.wallThickness, 0, halfA + halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
+  add(-halfBridge, driverTailEnd + cfg.wallThickness, 0, halfBridge, reflectorTailEnd - cfg.wallThickness, cfg.floorThickness, "bridge");
 
   // Corner blocks (simplified to boxes for preview; STL uses CSG union)
   for (const xc of [-halfA, halfA]) {
@@ -286,15 +290,12 @@ export function buildFrameGeometry(
     }
   }
 
-  // Boom body
-  const boomStart = driverY - halfOuter;
-  const boomBodyEnd = reflectorY + halfOuter;
-  add(-halfBoom, boomStart, 0, halfBoom, boomBodyEnd, boomHeight, "boom");
-
-  // Mounting tail (boom extends behind reflector)
-  const tailStart = boomBodyEnd;
-  const tailEnd = tailStart + cfg.mountingTailLength;
-  add(-halfBoom, tailStart, 0, halfBoom, tailEnd, boomHeight, "boom");
+  // Side boom + mounting tail (extends below driven element)
+  const boomX = -halfA - halfOuter - halfBoom;
+  const boomStart = reflectorY - halfOuter;
+  const boomBodyEnd = driverY + halfOuter;
+  const tailEnd = boomBodyEnd - cfg.mountingTailLength;
+  add(boomX, tailEnd, 0, boomX + cfg.boomWidth, boomStart, boomHeight, "boom");
 
   return { boxes };
 }
