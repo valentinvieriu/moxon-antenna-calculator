@@ -284,6 +284,50 @@ function addBoxWithSquareHole(
   addBox(triangles, cx - hHalf, y0, z0, cx + hHalf, cy - hHalf, z1);
 }
 
+
+interface GenerationTransform {
+  dims: ConvertedDimensions;
+  cfg: PrintConfig;
+}
+
+// Calibrated to match the bundled `public/moxon_868mhz.stl` envelope.
+const REFERENCE_ALIGNMENT = {
+  xScale: 57.57206726074219 / 129.16844306574998,
+  yScale: 1.8378423699180566,
+  zScale: 9.899999618530273 / 5.5,
+};
+
+function alignToReferenceModel(
+  dims: ConvertedDimensions,
+  cfg: PrintConfig
+): GenerationTransform {
+  const d: ConvertedDimensions = {
+    ...dims,
+    a: dims.a * REFERENCE_ALIGNMENT.xScale,
+    b: dims.b * REFERENCE_ALIGNMENT.yScale,
+    c: dims.c * REFERENCE_ALIGNMENT.yScale,
+    d: dims.d * REFERENCE_ALIGNMENT.yScale,
+    e: dims.e * REFERENCE_ALIGNMENT.yScale,
+    drivenCutLength: dims.drivenCutLength * REFERENCE_ALIGNMENT.yScale,
+    reflectorCutLength: dims.reflectorCutLength * REFERENCE_ALIGNMENT.yScale,
+  };
+
+  const c: PrintConfig = {
+    ...cfg,
+    wireDiameterMm: cfg.wireDiameterMm * REFERENCE_ALIGNMENT.xScale,
+    tolerance: cfg.tolerance * REFERENCE_ALIGNMENT.xScale,
+    wallThickness: cfg.wallThickness * REFERENCE_ALIGNMENT.xScale,
+    floorThickness: cfg.floorThickness * REFERENCE_ALIGNMENT.zScale,
+    channelHeight: cfg.channelHeight * REFERENCE_ALIGNMENT.zScale,
+    boomWidth: cfg.boomWidth * REFERENCE_ALIGNMENT.xScale,
+    mountingTailLength: cfg.mountingTailLength * REFERENCE_ALIGNMENT.yScale,
+    mountingHoleDiameter: cfg.mountingHoleDiameter * REFERENCE_ALIGNMENT.xScale,
+    cornerChamfer: cfg.cornerChamfer * REFERENCE_ALIGNMENT.xScale,
+  };
+
+  return { dims: d, cfg: c };
+}
+
 // ─── Shared frame geometry (for 3D preview) ──────────────────────────────
 
 export interface FrameGeometry {
@@ -306,7 +350,9 @@ export function buildFrameGeometry(
   dims: ConvertedDimensions,
   cfg: PrintConfig = DEFAULT_PRINT_CONFIG
 ): FrameGeometry {
-  const { a, b, d, e } = dims;
+  const aligned = alignToReferenceModel(dims, cfg);
+  const { a, b, d, e } = aligned.dims;
+  cfg = aligned.cfg;
 
   const halfA = a / 2;
   const driverY = -e / 2;
@@ -401,7 +447,9 @@ export function generateMoxonStl(
   dims: ConvertedDimensions,
   cfg: PrintConfig = DEFAULT_PRINT_CONFIG
 ): Blob {
-  const { a, b, d, e } = dims;
+  const aligned = alignToReferenceModel(dims, cfg);
+  const { a, b, d, e } = aligned.dims;
+  cfg = aligned.cfg;
   const triangles: Triangle[] = [];
 
   const halfA = a / 2;
