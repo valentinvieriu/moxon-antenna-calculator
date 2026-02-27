@@ -73,6 +73,17 @@ The app defaults to an EU868 Meshtastic example (869.525 MHz, 1.38 mm conductor)
 - `lib/moxon-stl-generator.ts` – binary STL generation utilities
 - `components/` – form, diagram, results table, and 3D preview components
 
+## PR Build Previews
+
+Every pull request targeting `main` now triggers the **PR Preview Build** GitHub Actions workflow.
+
+It will:
+- install dependencies
+- run a production `next build`
+- upload a downloadable build artifact (`nextjs-preview-<pr-number>`)
+
+Use this artifact to verify that the app builds successfully before merging.
+
 ## Notes
 
 - This tool helps with dimensioning and prototyping; real-world performance still depends on materials, assembly quality, nearby objects, and tuning/measurement.
