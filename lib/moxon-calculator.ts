@@ -1,6 +1,26 @@
-// Moxon antenna dimension calculator
-// Based on algorithm by L.B. Cebik, W4RNL
-// http://www.cebik.com/moxon/moxgen.html
+/**
+ * Moxon antenna dimension calculator.
+ *
+ * Method reference
+ * ----------------
+ * The geometry calculation implemented here follows the polynomial-fit approach
+ * popularized by L.B. Cebik (W4RNL) in the original Moxon rectangle calculator.
+ *
+ * Why polynomial fits?
+ * - A Moxon rectangle can be defined by 5 key dimensions (A..E) once frequency and
+ *   conductor diameter are known.
+ * - Cebik's method uses empirically derived equations that map the conductor
+ *   electrical diameter (in wavelengths) to each geometry term.
+ * - Those equations are fast, deterministic, and suitable for instant UI feedback.
+ *
+ * Scope of this module
+ * --------------------
+ * 1) Normalize wire diameter into electrical units (wavelength fraction).
+ * 2) Evaluate Cebik polynomial equations for A/B/C/D.
+ * 3) Apply practical correction factors (insulation + material).
+ * 4) Derive E and cut-length values from A/B/C/D.
+ * 5) Convert all wavelength outputs into common linear units.
+ */
 
 export type DiameterUnit = "in" | "mm" | "awg" | "wl";
 export type OutputUnit = "wl" | "ft" | "in" | "m" | "mm";
@@ -41,23 +61,51 @@ export interface MoxonResults {
   };
 }
 
-// Conversion factors
+/**
+ * Wavelength conversion constants expressed per MHz.
+ *
+ * Example:
+ * wavelength_ft = SPEED_OF_LIGHT_FT / frequencyMHz
+ *
+ * These constants are rounded practical values commonly used in amateur radio
+ * calculators, trading tiny theoretical precision for consistency and usability.
+ */
 const SPEED_OF_LIGHT_FT = 983.5592; // feet per MHz wavelength
 const SPEED_OF_LIGHT_IN = 11802.71; // inches per MHz wavelength
 const SPEED_OF_LIGHT_M = 299.7925; // meters per MHz wavelength
 const SPEED_OF_LIGHT_MM = 299792.5; // mm per MHz wavelength
 
-// Material correction is a practical tuning offset for common hobby wire choices.
-// Copper is the baseline used by most calculators.
+/**
+ * Material correction factor.
+ *
+ * This app treats copper as baseline (factor = 1). Stainless is modeled as a
+ * slight electrical shortening for the same physical geometry, therefore a
+ * small down-scaling factor is applied.
+ *
+ * NOTE: This is a practical approximation, not a full electromagnetic material
+ * model. Final tuning in the built environment is still recommended.
+ */
 const MATERIAL_CORRECTION_FACTOR: Record<WireMaterial, number> = {
   copper: 1,
   stainless: 0.992,
 };
 
-// Velocity factor for sleeved (PVC-insulated) wire
+/**
+ * Velocity factor for sleeved (insulated) wire.
+ *
+ * Insulation increases effective electrical length, so physical elements are
+ * often shortened by a factor near 0.95-0.98. We use 0.97 as a pragmatic
+ * default suitable for many PVC-insulated builds.
+ */
 const SLEEVED_VELOCITY_FACTOR = 0.97;
 
-// Convert wire diameter to wavelengths
+/**
+ * Convert conductor diameter into wavelengths.
+ *
+ * The Cebik equations are parameterized by electrical diameter (dw), not by
+ * raw metric/imperial units. Therefore every input path is normalized to a
+ * wavelength fraction before geometry equations are evaluated.
+ */
 function convertToWavelengths(
   diameter: number,
   unit: DiameterUnit,
@@ -71,7 +119,7 @@ function convertToWavelengths(
     case "mm":
       return diameter / (SPEED_OF_LIGHT_MM / frequencyMHz);
     case "awg": {
-      // AWG to inches conversion
+      // AWG -> inches: standard logarithmic wire-gauge relation.
       const diameterInches = 0.005 * Math.pow(92, (36 - diameter) / 39);
       return diameterInches / (SPEED_OF_LIGHT_IN / frequencyMHz);
     }
@@ -80,7 +128,25 @@ function convertToWavelengths(
   }
 }
 
-// Calculate Moxon dimensions based on Cebik's algorithm
+/**
+ * Compute Moxon rectangle dimensions for a given frequency and wire diameter.
+ *
+ * Step-by-step method:
+ * 1) Validate numeric safety (avoid log(<=0) and divide-by-zero paths).
+ * 2) Convert wire diameter to wavelengths: dw.
+ * 3) Compute log10(dw), the independent variable used by Cebik's fitted curves.
+ * 4) Evaluate polynomial equations for A/B/C and linear equation for D.
+ * 5) Apply multiplicative correction factors:
+ *      finalFactor = sleevedFactor * materialFactor
+ * 6) Derive secondary dimensions:
+ *      E = B + C + D
+ *      drivenCut = A + 2*B
+ *      reflectorCut = A + 2*D
+ * 7) Convert wavelength outputs to ft/in/m/mm using frequency-derived scale.
+ *
+ * Returned dimensions are always exposed both in wavelengths and converted units
+ * so UI consumers can switch representation without recalculating geometry.
+ */
 export function calculateMoxon(
   frequencyMHz: number,
   wireDiameter: number,
@@ -96,7 +162,7 @@ export function calculateMoxon(
   // Convert wire diameter to wavelengths
   const dw = convertToWavelengths(wireDiameter, diameterUnit, frequencyMHz);
 
-  // log base 10 of wire diameter in wavelengths
+  // log10(dw): Cebik formulas are functions of this value.
   const log10Diameter = 0.4342945 * Math.log(dw);
 
   // Check for warnings
@@ -107,7 +173,13 @@ export function calculateMoxon(
     warning = "Wire diameter very large for this frequency — results may be unreliable.";
   }
 
-  // Calculate dimensions in wavelengths using Cebik's polynomial formulas
+  /**
+   * Polynomial coefficients (A, B, C) and linear fit (D).
+   *
+   * These are direct numeric fits from the classic Cebik calculator lineage.
+   * The outputs are dimension fractions in wavelengths before practical
+   * correction factors are applied.
+   */
   let a =
     -0.0008571428571 * log10Diameter * log10Diameter +
     -0.009571428571 * log10Diameter +
@@ -125,7 +197,7 @@ export function calculateMoxon(
 
   let d = 0.001 * log10Diameter + 0.07178571429;
 
-  // Apply wire corrections
+  // Apply build-practical corrections as a single multiplicative factor.
   const sleevedFactor = isSleeved ? SLEEVED_VELOCITY_FACTOR : 1.0;
   const materialFactor = MATERIAL_CORRECTION_FACTOR[wireMaterial];
   const velocityFactor = sleevedFactor * materialFactor;
@@ -136,11 +208,11 @@ export function calculateMoxon(
 
   const e = b + c + d;
 
-  // Calculate cut lengths (total wire to cut from spool)
+  // Calculate cut lengths (total conductor to cut from spool before forming).
   const drivenCutLength = a + 2 * b;
   const reflectorCutLength = a + 2 * d;
 
-  // Wavelength conversion factors
+  // Frequency-specific conversion factors from wavelength units.
   const wlToFt = SPEED_OF_LIGHT_FT / frequencyMHz;
   const wlToIn = SPEED_OF_LIGHT_IN / frequencyMHz;
   const wlToM = SPEED_OF_LIGHT_M / frequencyMHz;
@@ -159,6 +231,11 @@ export function calculateMoxon(
     warning,
   };
 
+  /**
+   * Convert wavelength-based geometry into a linear output unit.
+   *
+   * factor = length of one wavelength in target unit at this frequency.
+   */
   function convert(factor: number): ConvertedDimensions {
     return {
       a: a * factor,
