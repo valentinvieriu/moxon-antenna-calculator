@@ -1,25 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import dynamic from "next/dynamic";
 import { MoxonDiagram } from "@/components/moxon-diagram";
 import { MoxonInputForm } from "@/components/moxon-input-form";
 import { MoxonResultsTable } from "@/components/moxon-results-table";
 import { UnitSelector } from "@/components/unit-selector";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateMoxon } from "@/lib/moxon-calculator";
 import type { DiameterUnit, OutputUnit, WireMaterial } from "@/lib/moxon-calculator";
 import { AlertCircle, Radio, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const Moxon3DPreview = dynamic(() => import("@/components/moxon-3d-preview"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-[320px] rounded-xl bg-diagram-bg border border-border flex items-center justify-center">
-      <p className="text-sm text-muted-foreground">Loading 3D preview...</p>
-    </div>
-  ),
-});
 
 export default function MoxonCalculator() {
   // Input state — defaults for EU868 Meshtastic with H07V-U 1.5mm2 wire (bare conductor = 1.38mm)
@@ -43,23 +32,6 @@ export default function MoxonCalculator() {
   }, [frequency, wireDiameter, diameterUnit, isSleeved, wireMaterial]);
 
   const isValid = results !== null;
-
-  // Compute wire diameter in mm for the STL generator
-  const wireDiameterMm = useMemo(() => {
-    const diam = parseFloat(wireDiameter);
-    if (isNaN(diam) || diam <= 0) return 1.38;
-    switch (diameterUnit) {
-      case "mm": return diam;
-      case "in": return diam * 25.4;
-      case "awg": return 0.005 * Math.pow(92, (36 - diam) / 39) * 25.4;
-      case "wl": {
-        const freq = parseFloat(frequency);
-        if (isNaN(freq) || freq <= 0) return 1.38;
-        return diam * (299792.5 / freq);
-      }
-      default: return diam;
-    }
-  }, [wireDiameter, diameterUnit, frequency]);
 
   const loadMeshtasticDefaults = () => {
     setFrequency("869.525");
@@ -126,25 +98,12 @@ export default function MoxonCalculator() {
           </div>
         )}
 
-        {/* Diagram / 3D Preview Section */}
+        {/* Diagram Section */}
         <section aria-labelledby="diagram-heading">
-          <Tabs defaultValue="2d" className="w-full">
-            <div className="flex items-center justify-between mb-3">
-              <h2 id="diagram-heading" className="text-sm font-medium text-muted-foreground">
-                Antenna Structure
-              </h2>
-              <TabsList className="h-8">
-                <TabsTrigger value="2d" className="text-xs px-3 h-7">2D Diagram</TabsTrigger>
-                <TabsTrigger value="3d" className="text-xs px-3 h-7">3D Preview</TabsTrigger>
-              </TabsList>
-            </div>
-            <TabsContent value="2d" className="mt-0">
-              <MoxonDiagram results={results} displayUnit={displayUnit} />
-            </TabsContent>
-            <TabsContent value="3d" className="mt-0">
-              <Moxon3DPreview results={results} wireDiameterMm={wireDiameterMm} />
-            </TabsContent>
-          </Tabs>
+          <h2 id="diagram-heading" className="text-sm font-medium text-muted-foreground mb-3">
+            Antenna Structure
+          </h2>
+          <MoxonDiagram results={results} displayUnit={displayUnit} />
         </section>
 
         {/* Unit Selector */}
@@ -159,8 +118,6 @@ export default function MoxonCalculator() {
             <MoxonResultsTable
               results={results}
               displayUnit={displayUnit}
-              frequencyMHz={parseFloat(frequency)}
-              wireDiameterMm={wireDiameterMm}
             />
           </section>
         )}

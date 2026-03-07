@@ -2,24 +2,14 @@
 
 import type { MoxonResults, OutputUnit } from "@/lib/moxon-calculator";
 import { formatDimension, unitLabels } from "@/lib/moxon-calculator";
-import { generateMoxonStl, downloadStl, DEFAULT_PRINT_CONFIG } from "@/lib/moxon-stl-generator";
-import { Button } from "@/components/ui/button";
-import { Scissors, Download } from "lucide-react";
+import { Scissors } from "lucide-react";
 
 interface MoxonResultsTableProps {
   results: MoxonResults;
   displayUnit: OutputUnit;
-  frequencyMHz: number;
-  wireDiameterMm: number;
 }
 
-export function MoxonResultsTable({ results, displayUnit, frequencyMHz, wireDiameterMm }: MoxonResultsTableProps) {
-  const handleDownloadStl = () => {
-    const cfg = { ...DEFAULT_PRINT_CONFIG, wireDiameterMm };
-    const blob = generateMoxonStl(results.converted.mm, cfg);
-    downloadStl(blob, frequencyMHz);
-  };
-
+export function MoxonResultsTable({ results, displayUnit }: MoxonResultsTableProps) {
   const data = results.converted[displayUnit];
   const decimals = displayUnit === "wl" ? 4 : displayUnit === "mm" ? 1 : 2;
 
@@ -129,26 +119,6 @@ export function MoxonResultsTable({ results, displayUnit, frequencyMHz, wireDiam
         )}
       </div>
 
-      {/* Download STL */}
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-medium text-muted-foreground">
-          3D-Printable Frame
-        </h3>
-        <Button
-          onClick={handleDownloadStl}
-          className="w-full gap-2"
-          variant="outline"
-        >
-          <Download className="w-4 h-4" />
-          Download STL
-        </Button>
-        <p className="text-xs text-muted-foreground">
-          Channel: {wireDiameterMm.toFixed(1)} mm wire + {DEFAULT_PRINT_CONFIG.tolerance} mm tolerance,
-          {" "}{DEFAULT_PRINT_CONFIG.wallThickness} mm walls, {DEFAULT_PRINT_CONFIG.floorThickness} mm floor.
-          Chamfered corners, end caps, side bridges, {DEFAULT_PRINT_CONFIG.mountingTailLength} mm tail
-          with {DEFAULT_PRINT_CONFIG.mountingHoleDiameter} mm zip-tie hole. Ready for slicers (mm units).
-        </p>
-      </div>
     </div>
   );
 }
